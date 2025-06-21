@@ -21,14 +21,14 @@ pip install -r requirements.txt
 
 cd smiles_features
 
-python my_library.py --mode MODE --input INPUT.csv --output OUTPUT [options]
+python smilex.py --mode MODE --input INPUT.csv --output OUTPUT [options]
 
 
 ## Modes
 
 ### 1. global: Extract RDKit2D descriptors (200 features)
 
-python my_library.py --mode global --input input.csv --output global_features --output_type csv --normalization minmax --fill_nan True
+python smilex.py --mode global --input input.csv --output global_features --output_type csv --normalization minmax --fill_nan True
 
 Required:
 
@@ -42,7 +42,7 @@ Optional:
 
 ### 2. local: Extract atom/bond features from molecules
 
-python my_library.py --mode local --input input.csv --output local_features --onehot True --pca True
+python smilex.py --mode local --input input.csv --output local_features --onehot True --pca True
 
 Outputs:
 
@@ -52,7 +52,7 @@ bond_features.csv
 
 ### 3. vae: Compress global features using Variational Autoencoder
 
-python my_library.py --mode vae --input global_features.csv --output vae_latent --latent_dim 32 --epochs 1000
+python smilex.py --mode vae --input global_features.csv --output vae_latent --latent_dim 32 --epochs 1000
 
 Output:
 
@@ -60,7 +60,7 @@ vae_latent.npy
 
 ### 4. ae: Compress global features using Autoencoder (AE)
 
-python my_library.py --mode ae --input global_features.csv --output ae_latent --latent_dim 16 --epochs 10
+python smilex.py --mode ae --input global_features.csv --output ae_latent --latent_dim 16 --epochs 10
 
 Output:
 
