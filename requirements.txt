@@ -1,0 +1,19 @@
+# Core libraries
+numpy
+pandas
+scikit-learn
+tqdm
+
+# RDKit for chemical processing (use conda or pip install carefully)
+rdkit-pypi
+
+# Deep learning libraries
+torch
+torchvision
+torchaudio
+
+tensorflow
+keras
+
+# For CLI usage and compatibility
+argparse
