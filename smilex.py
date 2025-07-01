@@ -61,12 +61,12 @@ def main():
             epochs=args.epochs
         )
     elif args.mode == 'ae':
-    run_ae_encoding(
-        input_csv=args.input,
-        output_file=args.output,
-        latent_dim=args.latent_dim,
-        epochs=args.epochs
-    )
+        run_ae_encoding(
+            input_csv=args.input,
+            output_file=args.output,
+            latent_dim=args.latent_dim,
+            epochs=args.epochs
+        )
 
 if __name__ == '__main__':
     main()
