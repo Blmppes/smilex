@@ -6,6 +6,7 @@ tqdm
 
 # RDKit for chemical processing (use conda or pip install carefully)
 rdkit-pypi
+descriptastorus
 
 # Deep learning libraries
 torch
