@@ -52,7 +52,8 @@ def extract_all_features(input_path, output_path, normalization='False', fill_na
 
   #tf.random.set_seed(s)
   #seed(s)
-  second_pca = PCA(n_components = 50) 
+  n_components = min(50, atom_features.shape[0], atom_features.shape[1])
+  second_pca = PCA(n_components=n_components)
   data_atom_pca = second_pca.fit_transform(atom_features)
   
   pcaNames = []
