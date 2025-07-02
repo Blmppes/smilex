@@ -118,23 +118,41 @@ class LocalFeatures:
 
 # --- Feature class for batch of molecules ---
 class BatchLocalFeatures:
-    def __init__(self, smiles_list, onehot=False, pca=False, ids=None):
-        self.mol_graphs = [LocalFeatures(sm, onehot, pca, ids[i] if ids else None)
-                           for i, sm in enumerate(smiles_list)]
+    def __init__(self, mol_graphs):
+        self.mol_graphs = mol_graphs
+        self.n_atoms = 0
+        self.n_bonds = 0
+        self.a_scope = []
+        self.b_scope = []
 
-        self.f_atoms = sum((g.f_atoms for g in self.mol_graphs), [])
-        self.f_bonds = sum((g.f_bonds for g in self.mol_graphs), [])
-        self.f_atoms_pca = sum((g.f_atoms_pca.tolist() for g in self.mol_graphs if g.f_atoms_pca != []), [])
-        self.f_bonds_pca = sum((g.f_bonds_pca.tolist() for g in self.mol_graphs if g.f_bonds_pca != []), [])
-        self.f_atoms_id = sum((g.mol_id_atoms for g in self.mol_graphs), [])
-        self.f_bonds_id = sum((g.mol_id_bonds for g in self.mol_graphs), [])
+        f_atoms, f_bonds = [], []
+        f_atoms_pca, f_bonds_pca = [], []
+        f_atoms_id, f_bonds_id = [], []
 
-        self.n_atoms = len(self.f_atoms)
-        self.n_bonds = len(self.f_bonds)
-        self.a_scope = [(sum(g.n_atoms for g in self.mol_graphs[:i]), g.n_atoms)
-                        for i, g in enumerate(self.mol_graphs)]
-        self.b_scope = [(sum(g.n_bonds for g in self.mol_graphs[:i]), g.n_bonds)
-                        for i, g in enumerate(self.mol_graphs)]
+        for g in mol_graphs:
+            f_atoms.extend(g.f_atoms)
+            f_bonds.extend(g.f_bonds)
+
+            if isinstance(g.f_atoms_pca, np.ndarray) and g.f_atoms_pca.size > 0:
+                f_atoms_pca.extend(g.f_atoms_pca.tolist())
+            if isinstance(g.f_bonds_pca, np.ndarray) and g.f_bonds_pca.size > 0:
+                f_bonds_pca.extend(g.f_bonds_pca.tolist())
+
+            f_atoms_id.extend(g.mol_id_atoms)
+            f_bonds_id.extend(g.mol_id_bonds)
+
+            self.a_scope.append((self.n_atoms, g.n_atoms))
+            self.b_scope.append((self.n_bonds, g.n_bonds))
+            self.n_atoms += g.n_atoms
+            self.n_bonds += g.n_bonds
+
+        self.f_atoms = f_atoms
+        self.f_bonds = f_bonds
+        self.f_atoms_pca = f_atoms_pca
+        self.f_bonds_pca = f_bonds_pca
+        self.f_atoms_id = f_atoms_id
+        self.f_bonds_id = f_bonds_id
+
 
 # --- Entry function ---
 def mol2local(mols, onehot=False, pca=False, ids=None):
