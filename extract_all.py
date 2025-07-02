@@ -4,12 +4,16 @@ from sklearn.decomposition import PCA
 from sklearn.feature_selection import VarianceThreshold
 from sklearn import preprocessing
 from global_features import process_global_feature_extraction
-from local_features import extract_local_features
+from local_features import mol2local
 
 def extract_all_features(input_path, output_path, normalization='False', fill_nan=False):
   print("Reading SMILES file...")
+  df = pd.read_csv(input_path).dropna(subset=["SMILES"])
+  smiles_list = df["SMILES"].tolist()
+  ids = df.index.tolist()
+  
   print("Extracting local features (onehot=True, pca=True)...")
-  local_batch = extract_local_features(input_path, output_path, onehot=True, pca=True)
+  local_batch = mol2local(smiles_list, onehot=True, pca=True, ids=ids)
 
   atom_df = pd.DataFrame(local_batch.f_atoms_pca).add_prefix("A_")
   bond_df = pd.DataFrame(local_batch.f_bonds_pca).add_prefix("B_")
