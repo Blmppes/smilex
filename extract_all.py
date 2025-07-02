@@ -57,7 +57,7 @@ def extract_all_features(input_path, output_path, normalization='False', fill_na
   data_atom_pca = second_pca.fit_transform(atom_features)
   
   pcaNames = []
-  for p in range(1,51):
+  for p in range(1,n_components+1):
     pc = str(p)
     pca = 'PCA'+pc
     pcaNames.append(pca)
