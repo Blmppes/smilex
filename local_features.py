@@ -1,20 +1,17 @@
-# local_features.py
-
 import numpy as np
 import pandas as pd
-from typing import List, Union
+import sklearn
+import rdkit
+from typing import List, Tuple, Union
 from rdkit import Chem
 from sklearn.decomposition import PCA
 
-# --- One-hot encoding ---
 def one_hot_encoding(value, choices):
-    encoding = [0] * len(choices)
+    encoding = [0] * (len(choices))
     index = choices.index(value) if value in choices else -1
-    if index != -1:
-        encoding[index] = 1
+    encoding[index] = 1
     return encoding
 
-# --- Atom feature mappings ---
 ATOM_FEATURES = {
     'atomic_num': list(range(118)),
     'degree': [0, 1, 2, 3, 4, 5],
@@ -27,10 +24,9 @@ ATOM_FEATURES = {
         Chem.rdchem.HybridizationType.SP3,
         Chem.rdchem.HybridizationType.SP3D,
         Chem.rdchem.HybridizationType.SP3D2
-    ],
+    ]
 }
 
-# --- Atom features ---
 def atom_features_raw(atom):
     return [
         atom.GetAtomicNum(),
@@ -44,27 +40,22 @@ def atom_features_raw(atom):
     ]
 
 def atom_features_onehot(atom):
-    return (
-        one_hot_encoding(atom.GetAtomicNum() - 1, ATOM_FEATURES['atomic_num']) +
-        one_hot_encoding(atom.GetTotalDegree(), ATOM_FEATURES['degree']) +
-        one_hot_encoding(atom.GetFormalCharge(), ATOM_FEATURES['formal_charge']) +
-        one_hot_encoding(int(atom.GetChiralTag()), ATOM_FEATURES['chiral_tag']) +
-        one_hot_encoding(int(atom.GetTotalNumHs()), ATOM_FEATURES['num_Hs']) +
-        one_hot_encoding(int(atom.GetHybridization()), ATOM_FEATURES['hybridization']) +
-        [1 if atom.GetIsAromatic() else 0] +
-        [atom.GetMass() * 0.01]
-    )
+    return one_hot_encoding(atom.GetAtomicNum() - 1, ATOM_FEATURES['atomic_num']) + \
+           one_hot_encoding(atom.GetTotalDegree(), ATOM_FEATURES['degree']) + \
+           one_hot_encoding(atom.GetFormalCharge(), ATOM_FEATURES['formal_charge']) + \
+           one_hot_encoding(int(atom.GetChiralTag()), ATOM_FEATURES['chiral_tag']) + \
+           one_hot_encoding(int(atom.GetTotalNumHs()), ATOM_FEATURES['num_Hs']) + \
+           one_hot_encoding(int(atom.GetHybridization()), ATOM_FEATURES['hybridization']) + \
+           [1 if atom.GetIsAromatic() else 0] + \
+           [atom.GetMass() * 0.01]
 
-# --- Bond features ---
 def bond_features_raw(bond):
     bt = bond.GetBondType()
-    btt = {
-        Chem.rdchem.BondType.SINGLE: 0,
-        Chem.rdchem.BondType.DOUBLE: 1,
-        Chem.rdchem.BondType.TRIPLE: 2,
-        Chem.rdchem.BondType.AROMATIC: 3
-    }.get(bt, -1)
-
+    if bt == Chem.rdchem.BondType.SINGLE: btt = 0
+    elif bt == Chem.rdchem.BondType.DOUBLE: btt = 1
+    elif bt == Chem.rdchem.BondType.TRIPLE: btt = 2
+    elif bt == Chem.rdchem.BondType.AROMATIC: btt = 3
+    else: btt = -1
     return [
         btt,
         bond.GetIsConjugated() if bt is not None else 0,
@@ -74,49 +65,57 @@ def bond_features_raw(bond):
 
 def bond_features_onehot(bond):
     bt = bond.GetBondType()
-    return [
+    fbond = [
         bt == Chem.rdchem.BondType.SINGLE,
         bt == Chem.rdchem.BondType.DOUBLE,
         bt == Chem.rdchem.BondType.TRIPLE,
         bt == Chem.rdchem.BondType.AROMATIC,
         bond.GetIsConjugated() if bt is not None else 0,
         bond.IsInRing() if bt is not None else 0
-    ] + one_hot_encoding(int(bond.GetStereo()), list(range(6)))
+    ]
+    fbond += one_hot_encoding(int(bond.GetStereo()), list(range(6)))
+    return fbond
 
-# --- Feature class for one molecule ---
 class LocalFeatures:
     def __init__(self, mol, onehot=False, pca=False, ids=None):
         if isinstance(mol, str):
             mol = Chem.MolFromSmiles(mol)
-
         self.mol = mol
         self.onehot = onehot
+        self.n_atoms = 0
+        self.n_bonds = 0
+        self.f_atoms = []
+        self.f_bonds = []
+        self.f_atoms_pca = []
+        self.f_bonds_pca = []
+        self.mol_id_atoms = []
+        self.mol_id_bonds = []
 
-        self.f_atoms = [
-            atom_features_onehot(atom) if onehot else atom_features_raw(atom)
-            for atom in mol.GetAtoms()
-        ]
-        self.f_bonds = [
-            bond_features_onehot(bond) if onehot else bond_features_raw(bond)
-            for bond in mol.GetBonds()
-        ]
+        if onehot:
+            self.f_atoms = [atom_features_onehot(atom) for atom in mol.GetAtoms()]
+            self.f_bonds = [bond_features_onehot(bond) for bond in mol.GetBonds()]
+        else:
+            self.f_atoms = [atom_features_raw(atom) for atom in mol.GetAtoms()]
+            self.f_bonds = [bond_features_raw(bond) for bond in mol.GetBonds()]
 
         self.n_atoms = len(self.f_atoms)
         self.n_bonds = len(self.f_bonds)
-        self.f_atoms_dim = len(self.f_atoms[0]) if self.f_atoms else 0
-        self.f_bonds_dim = len(self.f_bonds[0]) if self.f_bonds else 0
+        self.f_atoms_dim = np.shape(self.f_atoms)[1] if self.n_atoms > 0 else 0
+        self.f_bonds_dim = np.shape(self.f_bonds)[1] if self.n_bonds > 0 else 0
 
-        self.f_atoms_pca = []
-        self.f_bonds_pca = []
+        if pca and self.n_atoms > 0 and self.n_bonds > 0:
+            fa = np.array(self.f_atoms).T
+            fb = np.array(self.f_bonds).T
+            pca_model = PCA(n_components=1)
+            pc_atoms = pca_model.fit_transform(fa)
+            pc_bonds = pca_model.fit_transform(fb)
+            self.f_atoms_pca = pc_atoms.T.tolist()
+            self.f_bonds_pca = pc_bonds.T.tolist()
 
-        if pca and self.f_atoms and self.f_bonds:
-            self.f_atoms_pca = PCA(n_components=1).fit_transform(np.array(self.f_atoms).T).T
-            self.f_bonds_pca = PCA(n_components=1).fit_transform(np.array(self.f_bonds).T).T
+        if ids is not None:
+            self.mol_id_atoms = [ids] * self.n_atoms
+            self.mol_id_bonds = [ids] * self.n_bonds
 
-        self.mol_id_atoms = [ids] * self.n_atoms if ids is not None else []
-        self.mol_id_bonds = [ids] * self.n_bonds if ids is not None else []
-
-# --- Feature class for batch of molecules ---
 class BatchLocalFeatures:
     def __init__(self, mol_graphs):
         self.mol_graphs = mol_graphs
@@ -124,36 +123,43 @@ class BatchLocalFeatures:
         self.n_bonds = 0
         self.a_scope = []
         self.b_scope = []
-
-        f_atoms, f_bonds = [], []
-        f_atoms_pca, f_bonds_pca = [], []
-        f_atoms_id, f_bonds_id = [], []
+        self.f_atoms = []
+        self.f_bonds = []
+        self.f_atoms_pca = []
+        self.f_bonds_pca = []
+        self.f_atoms_id = []
+        self.f_bonds_id = []
 
         for g in mol_graphs:
-            f_atoms.extend(g.f_atoms)
-            f_bonds.extend(g.f_bonds)
-
-            if isinstance(g.f_atoms_pca, np.ndarray) and g.f_atoms_pca.size > 0:
-                f_atoms_pca.extend(g.f_atoms_pca.tolist())
-            if isinstance(g.f_bonds_pca, np.ndarray) and g.f_bonds_pca.size > 0:
-                f_bonds_pca.extend(g.f_bonds_pca.tolist())
-
-            f_atoms_id.extend(g.mol_id_atoms)
-            f_bonds_id.extend(g.mol_id_bonds)
-
+            self.f_atoms.extend(g.f_atoms)
+            self.f_bonds.extend(g.f_bonds)
+            self.f_atoms_pca.extend(g.f_atoms_pca)
+            self.f_bonds_pca.extend(g.f_bonds_pca)
+            self.f_atoms_id.extend(g.mol_id_atoms)
+            self.f_bonds_id.extend(g.mol_id_bonds)
             self.a_scope.append((self.n_atoms, g.n_atoms))
             self.b_scope.append((self.n_bonds, g.n_bonds))
             self.n_atoms += g.n_atoms
             self.n_bonds += g.n_bonds
 
-        self.f_atoms = f_atoms
-        self.f_bonds = f_bonds
-        self.f_atoms_pca = f_atoms_pca
-        self.f_bonds_pca = f_bonds_pca
-        self.f_atoms_id = f_atoms_id
-        self.f_bonds_id = f_bonds_id
-
-
-# --- Entry function ---
 def mol2local(mols, onehot=False, pca=False, ids=None):
-    return BatchLocalFeatures(mols, onehot=onehot, pca=pca, ids=ids)
+    if ids is not None:
+        return BatchLocalFeatures([LocalFeatures(mol, onehot, pca, iid) for mol, iid in zip(mols, ids)])
+    else:
+        return BatchLocalFeatures([LocalFeatures(mol, onehot, pca) for mol in mols])
+
+def extract_local_features(input_path, output_path, onehot=False, pca=False):
+    print(f"Reading input file from {input_path}...")
+    df = pd.read_csv(input_path).dropna(subset=["SMILES"])
+    smiles_list = df["SMILES"].tolist()
+    ids = df.index.tolist()
+    print(f"Extracting local features (onehot={onehot}, pca={pca})...")
+    batch = mol2local(smiles_list, onehot=onehot, pca=pca, ids=ids)
+    base = output_path.rsplit('.', 1)[0]
+    if pca:
+        pd.DataFrame(batch.f_atoms_pca).to_csv(f"{base}_atom_PCA.csv", index=False)
+        pd.DataFrame(batch.f_bonds_pca).to_csv(f"{base}_bond_PCA.csv", index=False)
+    else:
+        pd.DataFrame(batch.f_atoms).to_csv(f"{base}_atom.csv", index=False)
+        pd.DataFrame(batch.f_bonds).to_csv(f"{base}_bond.csv", index=False)
+    print("Feature extraction completed and files saved.")
