@@ -8,19 +8,21 @@ from ae_encoder import run_ae_encoding
 def extract_local_features(input_path, output_path, onehot, pca):
     print(f"Reading input file from {input_path}...")
     df = pd.read_csv(input_path).dropna(subset=["SMILES"])
-    
+
     smiles_list = df["SMILES"].tolist()
     ids = df.index.tolist()  # Or df['compound_stem'] if available
 
     print(f"Extracting local features (onehot={onehot}, pca={pca})...")
     batch = BatchLocalFeatures(smiles_list, onehot=onehot, pca=pca, ids=ids)
 
+    base = output_path.rsplit('.', 1)[0]  # Remove extension if exists
+
     if pca:
-        pd.DataFrame(batch.f_atoms_pca).to_csv(output_path.replace('.csv', '_atom_PCA.csv'), index=False)
-        pd.DataFrame(batch.f_bonds_pca).to_csv(output_path.replace('.csv', '_bond_PCA.csv'), index=False)
+        pd.DataFrame(batch.f_atoms_pca).to_csv(f"{base}_atom_PCA.csv", index=False)
+        pd.DataFrame(batch.f_bonds_pca).to_csv(f"{base}_bond_PCA.csv", index=False)
     else:
-        pd.DataFrame(batch.f_atoms).to_csv(output_path.replace('.csv', '_atom.csv'), index=False)
-        pd.DataFrame(batch.f_bonds).to_csv(output_path.replace('.csv', '_bond.csv'), index=False)
+        pd.DataFrame(batch.f_atoms).to_csv(f"{base}_atom.csv", index=False)
+        pd.DataFrame(batch.f_bonds).to_csv(f"{base}_bond.csv", index=False)
 
     print("Feature extraction completed and files saved.")
 
