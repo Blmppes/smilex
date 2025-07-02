@@ -25,22 +25,32 @@ def extract_local_features(input_path, output_path, onehot, pca):
     print("Feature extraction completed and files saved.")
 
 
+import argparse
+
 def main():
     parser = argparse.ArgumentParser(description="SMILES Feature Extraction Library")
     parser.add_argument('--input', required=True, help='Input CSV file with SMILES column.')
     parser.add_argument('--output', required=True, help='Base output file name (no extension).')
     parser.add_argument('--output_type', choices=['csv', 'parquet'], default='csv', help='Output file format.')
-    parser.add_argument('--mode', choices=['local', 'global'], required=True, help='Feature extraction mode.')
-    parser.add_argument('--onehot', type=bool, default=False, help='Use one-hot encoding (local mode only).')
-    parser.add_argument('--pca', type=bool, default=False, help='Apply PCA (local mode only).')
-    parser.add_argument('--normalization', choices=['False', 'CDF', 'minmax', 'standardscaler', 'robustscaler'],
-                        default='False', help='Normalization method (global mode only).')
-    parser.add_argument('--fill_nan', type=bool, default=False, help='Fill NaNs with median (global mode only).')
-    parser.add_argument('--latent_dim', type=int, default=32, help='Latent space dimension for VAE.')
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs for VAE.')
-    parser.add_argument('--latent_dim', type=int, default=16, help='Latent space size (for AE/VAE).')
-    parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs (for AE/VAE).')
+    parser.add_argument('--mode', choices=['local', 'global', 'vae', 'ae'], required=True, help='Feature extraction mode.')
 
+    # Parse initial arguments to check mode
+    args, remaining_args = parser.parse_known_args()
+
+    # Add mode-specific arguments
+    if args.mode == 'local':
+        parser.add_argument('--onehot', type=bool, default=False, help='Use one-hot encoding.')
+        parser.add_argument('--pca', type=bool, default=False, help='Apply PCA to local features.')
+    elif args.mode == 'global':
+        parser.add_argument('--normalization', choices=['False', 'CDF', 'minmax', 'standardscaler', 'robustscaler'],
+                            default='False', help='Normalization method for global features.')
+        parser.add_argument('--fill_nan', type=bool, default=False, help='Fill NaNs with median.')
+    elif args.mode in ['vae', 'ae']:
+        parser.add_argument('--latent_dim', type=int, default=32, help='Latent space dimension.')
+        parser.add_argument('--epochs', type=int, default=1000 if args.mode == 'vae' else 10,
+                            help='Number of training epochs.')
+
+    # Parse full arguments now
     args = parser.parse_args()
 
     if args.mode == 'local':
