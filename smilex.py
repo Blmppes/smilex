@@ -1,32 +1,9 @@
 import argparse
 import pandas as pd
-from local_features import mol2local
+from local_features import extract_local_features
 from global_features import process_global_feature_extraction
 from vae_encoder import run_vae_encoding
 from ae_encoder import run_ae_encoding
-
-def extract_local_features(input_path, output_path, onehot=False, pca=False):
-    print(f"Reading input file from {input_path}...")
-    df = pd.read_csv(input_path).dropna(subset=["SMILES"])
-
-    smiles_list = df["SMILES"].tolist()
-    ids = df.index.tolist()  # Or df['compound_stem'].tolist() if available
-
-    print(f"Extracting local features (onehot={onehot}, pca={pca})...")
-    batch = mol2local(smiles_list, onehot=onehot, pca=pca, ids=ids)
-
-    base = output_path.rsplit('.', 1)[0]  # Strip any extension
-
-    if pca:
-        pd.DataFrame(batch.f_atoms_pca).to_csv(f"{base}_atom_PCA.csv", index=False)
-        pd.DataFrame(batch.f_bonds_pca).to_csv(f"{base}_bond_PCA.csv", index=False)
-    else:
-        pd.DataFrame(batch.f_atoms).to_csv(f"{base}_atom.csv", index=False)
-        pd.DataFrame(batch.f_bonds).to_csv(f"{base}_bond.csv", index=False)
-
-    print(f"Local feature extraction complete.\nFiles saved as:\n- {base}_atom(.csv|_PCA.csv)\n- {base}_bond(.csv|_PCA.csv)")
-
-
 import argparse
 
 def main():
