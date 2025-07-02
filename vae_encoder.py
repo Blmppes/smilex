@@ -127,3 +127,7 @@ def run_vae_encoding(input_csv, output_file, latent_dim=32, epochs=1000):
     latent_vectors = torch.cat(latent_list, dim=0).numpy()
     np.save(output_file, latent_vectors)
     print(f"Saved encoded features to {output_file}")
+    
+    PATH = "VAE_weights.pth" # Common extensions are .pt or .pth
+    # Save the state_dict
+    torch.save(model.state_dict(), PATH)
