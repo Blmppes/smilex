@@ -70,5 +70,6 @@ def process_global_feature_extraction(input_path: str, output_path: str,
         features_df.to_parquet(f"{output_path}.parquet", index=False)
     else:
         raise ValueError("Unsupported output type. Choose 'csv' or 'parquet'.")
-
+    
     print("Done.")
+    return features_df
