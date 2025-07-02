@@ -1,11 +1,20 @@
+# local_features.py
+
 import numpy as np
+import pandas as pd
 from typing import List, Union
 from rdkit import Chem
 from sklearn.decomposition import PCA
 
+# --- One-hot encoding ---
+def one_hot_encoding(value, choices):
+    encoding = [0] * len(choices)
+    index = choices.index(value) if value in choices else -1
+    if index != -1:
+        encoding[index] = 1
+    return encoding
 
-# ===================== Atom and Bond Feature Definitions =====================
-
+# --- Atom feature mappings ---
 ATOM_FEATURES = {
     'atomic_num': list(range(118)),
     'degree': [0, 1, 2, 3, 4, 5],
@@ -21,18 +30,8 @@ ATOM_FEATURES = {
     ],
 }
 
-
-def one_hot_encoding(value, choices):
-    encoding = [0] * len(choices)
-    index = choices.index(value) if value in choices else -1
-    if index != -1:
-        encoding[index] = 1
-    return encoding
-
-
-# ===================== Atom and Bond Feature Extraction =====================
-
-def atom_features_raw(atom: Chem.rdchem.Atom) -> List[Union[int, float]]:
+# --- Atom features ---
+def atom_features_raw(atom):
     return [
         atom.GetAtomicNum(),
         atom.GetTotalDegree(),
@@ -44,8 +43,7 @@ def atom_features_raw(atom: Chem.rdchem.Atom) -> List[Union[int, float]]:
         atom.GetMass()
     ]
 
-
-def atom_features_onehot(atom: Chem.rdchem.Atom) -> List[Union[int, float]]:
+def atom_features_onehot(atom):
     return (
         one_hot_encoding(atom.GetAtomicNum() - 1, ATOM_FEATURES['atomic_num']) +
         one_hot_encoding(atom.GetTotalDegree(), ATOM_FEATURES['degree']) +
@@ -57,8 +55,8 @@ def atom_features_onehot(atom: Chem.rdchem.Atom) -> List[Union[int, float]]:
         [atom.GetMass() * 0.01]
     )
 
-
-def bond_features_raw(bond: Chem.rdchem.Bond) -> List[Union[int, float]]:
+# --- Bond features ---
+def bond_features_raw(bond):
     bt = bond.GetBondType()
     btt = {
         Chem.rdchem.BondType.SINGLE: 0,
@@ -69,90 +67,75 @@ def bond_features_raw(bond: Chem.rdchem.Bond) -> List[Union[int, float]]:
 
     return [
         btt,
-        int(bond.GetIsConjugated()) if bt else 0,
-        int(bond.IsInRing()) if bt else 0,
+        bond.GetIsConjugated() if bt is not None else 0,
+        bond.IsInRing() if bt is not None else 0,
         int(bond.GetStereo())
     ]
 
-
-def bond_features_onehot(bond: Chem.rdchem.Bond) -> List[int]:
+def bond_features_onehot(bond):
     bt = bond.GetBondType()
     return [
         bt == Chem.rdchem.BondType.SINGLE,
         bt == Chem.rdchem.BondType.DOUBLE,
         bt == Chem.rdchem.BondType.TRIPLE,
         bt == Chem.rdchem.BondType.AROMATIC,
-        int(bond.GetIsConjugated()) if bt else 0,
-        int(bond.IsInRing()) if bt else 0,
-        *one_hot_encoding(int(bond.GetStereo()), list(range(6)))
-    ]
+        bond.GetIsConjugated() if bt is not None else 0,
+        bond.IsInRing() if bt is not None else 0
+    ] + one_hot_encoding(int(bond.GetStereo()), list(range(6)))
 
-
-# ===================== Feature Extraction Classes =====================
-
+# --- Feature class for one molecule ---
 class LocalFeatures:
-    def __init__(self, mol: Union[str, Chem.Mol], onehot=False, pca=False, mol_id=None):
+    def __init__(self, mol, onehot=False, pca=False, ids=None):
         if isinstance(mol, str):
             mol = Chem.MolFromSmiles(mol)
-        self.mol = mol
-        self.mol_id = mol_id
-        self.onehot = onehot
-        self.pca_enabled = pca
 
-        # Extract features
-        self.f_atoms = self._extract_atom_features()
-        self.f_bonds = self._extract_bond_features()
+        self.mol = mol
+        self.onehot = onehot
+
+        self.f_atoms = [
+            atom_features_onehot(atom) if onehot else atom_features_raw(atom)
+            for atom in mol.GetAtoms()
+        ]
+        self.f_bonds = [
+            bond_features_onehot(bond) if onehot else bond_features_raw(bond)
+            for bond in mol.GetBonds()
+        ]
 
         self.n_atoms = len(self.f_atoms)
         self.n_bonds = len(self.f_bonds)
+        self.f_atoms_dim = len(self.f_atoms[0]) if self.f_atoms else 0
+        self.f_bonds_dim = len(self.f_bonds[0]) if self.f_bonds else 0
 
-        self.f_atoms_pca = self._apply_pca(self.f_atoms) if pca else []
-        self.f_bonds_pca = self._apply_pca(self.f_bonds) if pca else []
-
-        self.mol_id_atoms = [mol_id] * self.n_atoms if mol_id else []
-        self.mol_id_bonds = [mol_id] * self.n_bonds if mol_id else []
-
-    def _extract_atom_features(self):
-        extractor = atom_features_onehot if self.onehot else atom_features_raw
-        return [extractor(atom) for atom in self.mol.GetAtoms()]
-
-    def _extract_bond_features(self):
-        extractor = bond_features_onehot if self.onehot else bond_features_raw
-        return [extractor(bond) for bond in self.mol.GetBonds()]
-
-    def _apply_pca(self, features):
-        pca_model = PCA(n_components=1)
-        return pca_model.fit_transform(np.array(features)).flatten().tolist()
-
-
-class BatchLocalFeatures:
-    def __init__(self, mols: List[Union[str, Chem.Mol]], onehot=False, pca=False, ids=None):
-        self.mol_graphs = [
-            LocalFeatures(mol, onehot, pca, mol_id=(ids[i] if ids else None))
-            for i, mol in enumerate(mols)
-        ]
-        self._aggregate_features()
-
-    def _aggregate_features(self):
-        self.f_atoms = []
-        self.f_bonds = []
         self.f_atoms_pca = []
         self.f_bonds_pca = []
-        self.f_atoms_id = []
-        self.f_bonds_id = []
-        self.a_scope = []
-        self.b_scope = []
-        self.n_atoms = 0
-        self.n_bonds = 0
 
-        for graph in self.mol_graphs:
-            self.f_atoms.extend(graph.f_atoms)
-            self.f_bonds.extend(graph.f_bonds)
-            self.f_atoms_pca.extend(graph.f_atoms_pca)
-            self.f_bonds_pca.extend(graph.f_bonds_pca)
-            self.f_atoms_id.extend(graph.mol_id_atoms)
-            self.f_bonds_id.extend(graph.mol_id_bonds)
-            self.a_scope.append((self.n_atoms, graph.n_atoms))
-            self.b_scope.append((self.n_bonds, graph.n_bonds))
-            self.n_atoms += graph.n_atoms
-            self.n_bonds += graph.n_bonds
+        if pca and self.f_atoms and self.f_bonds:
+            self.f_atoms_pca = PCA(n_components=1).fit_transform(np.array(self.f_atoms).T).T
+            self.f_bonds_pca = PCA(n_components=1).fit_transform(np.array(self.f_bonds).T).T
+
+        self.mol_id_atoms = [ids] * self.n_atoms if ids is not None else []
+        self.mol_id_bonds = [ids] * self.n_bonds if ids is not None else []
+
+# --- Feature class for batch of molecules ---
+class BatchLocalFeatures:
+    def __init__(self, smiles_list, onehot=False, pca=False, ids=None):
+        self.mol_graphs = [LocalFeatures(sm, onehot, pca, ids[i] if ids else None)
+                           for i, sm in enumerate(smiles_list)]
+
+        self.f_atoms = sum((g.f_atoms for g in self.mol_graphs), [])
+        self.f_bonds = sum((g.f_bonds for g in self.mol_graphs), [])
+        self.f_atoms_pca = sum((g.f_atoms_pca.tolist() for g in self.mol_graphs if g.f_atoms_pca != []), [])
+        self.f_bonds_pca = sum((g.f_bonds_pca.tolist() for g in self.mol_graphs if g.f_bonds_pca != []), [])
+        self.f_atoms_id = sum((g.mol_id_atoms for g in self.mol_graphs), [])
+        self.f_bonds_id = sum((g.mol_id_bonds for g in self.mol_graphs), [])
+
+        self.n_atoms = len(self.f_atoms)
+        self.n_bonds = len(self.f_bonds)
+        self.a_scope = [(sum(g.n_atoms for g in self.mol_graphs[:i]), g.n_atoms)
+                        for i, g in enumerate(self.mol_graphs)]
+        self.b_scope = [(sum(g.n_bonds for g in self.mol_graphs[:i]), g.n_bonds)
+                        for i, g in enumerate(self.mol_graphs)]
+
+# --- Entry function ---
+def mol2local(mols, onehot=False, pca=False, ids=None):
+    return BatchLocalFeatures(mols, onehot=onehot, pca=pca, ids=ids)
