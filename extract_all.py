@@ -9,7 +9,7 @@ from local_features import extract_local_features
 def extract_all_features(input_path, output_path, normalization='False', fill_nan=False):
   print("Reading SMILES file...")
   print("Extracting local features (onehot=True, pca=True)...")
-  local_batch = extract_local_features(input_path, output_path, onehot=True, pca=True):
+  local_batch = extract_local_features(input_path, output_path, onehot=True, pca=True)
 
   atom_df = pd.DataFrame(local_batch.f_atoms_pca).add_prefix("A_")
   bond_df = pd.DataFrame(local_batch.f_bonds_pca).add_prefix("B_")
