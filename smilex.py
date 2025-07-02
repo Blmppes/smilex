@@ -4,6 +4,7 @@ from local_features import extract_local_features
 from global_features import process_global_feature_extraction
 from vae_encoder import run_vae_encoding
 from ae_encoder import run_ae_encoding
+from extract_all import  extract_all_features
 import argparse
 
 def main():
@@ -11,7 +12,7 @@ def main():
     parser.add_argument('--input', required=True, help='Input CSV file with SMILES column.')
     parser.add_argument('--output', required=True, help='Base output file name (no extension).')
     parser.add_argument('--output_type', choices=['csv', 'parquet'], default='csv', help='Output file format.')
-    parser.add_argument('--mode', choices=['local', 'global', 'vae', 'ae'], required=True, help='Feature extraction mode.')
+    parser.add_argument('--mode', choices=['local', 'global', 'vae', 'ae', 'all'], required=True, help='Feature extraction mode.')
 
     # Parse initial arguments to check mode
     args, remaining_args = parser.parse_known_args()
@@ -20,7 +21,7 @@ def main():
     if args.mode == 'local':
         parser.add_argument('--onehot', type=bool, default=False, help='Use one-hot encoding.')
         parser.add_argument('--pca', type=bool, default=False, help='Apply PCA to local features.')
-    elif args.mode == 'global':
+    elif args.mode in ['global', 'all']:
         parser.add_argument('--normalization', choices=['False', 'CDF', 'minmax', 'standardscaler', 'robustscaler'],
                             default='False', help='Normalization method for global features.')
         parser.add_argument('--fill_nan', type=bool, default=False, help='Fill NaNs with median.')
@@ -39,6 +40,13 @@ def main():
             input_path=args.input,
             output_path=args.output,
             output_type=args.output_type,
+            normalization=args.normalization,
+            fill_nan=args.fill_nan
+        )
+    elif args.mode == 'all':
+        extract_all_features(
+            input_path=args.input,
+            output_path=args.output,
             normalization=args.normalization,
             fill_nan=args.fill_nan
         )
