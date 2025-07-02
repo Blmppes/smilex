@@ -38,10 +38,6 @@ def extract_all_features(input_path, output_path, normalization='False', fill_na
   scaled_df = pd.DataFrame(scaled, columns = sheader)
   #scaled_df = scaled_df.transpose()
 
-  atom_features = atom_features.add_prefix('A_')
-  
-  bond_features = bond_features.add_prefix('B_')
-
   for i in range (0,12):
     i = str(i)
     column = 'B_'+i
