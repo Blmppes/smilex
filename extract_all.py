@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import VarianceThreshold
 from sklearn import preprocessing
+from global_features import 
+from local_features import extract_local_features
 
 atom_features = pd.read_csv('/kaggle/input/a-lot-of-compounds/atom_features_PCA.csv')
 
