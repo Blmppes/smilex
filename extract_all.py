@@ -15,8 +15,8 @@ def extract_all_features(input_path, output_path, normalization='False', fill_na
   print("Extracting local features (onehot=True, pca=True)...")
   local_batch = mol2local(smiles_list, onehot=True, pca=True, ids=ids)
 
-  atom_df = pd.DataFrame(local_batch.f_atoms_pca).add_prefix("A_")
-  bond_df = pd.DataFrame(local_batch.f_bonds_pca).add_prefix("B_")
+  atom_features = pd.DataFrame(local_batch.f_atoms_pca).add_prefix("A_")
+  bond_features = pd.DataFrame(local_batch.f_bonds_pca).add_prefix("B_")
 
   print("Extracting global features...")
   smilesF = process_global_feature_extraction(
